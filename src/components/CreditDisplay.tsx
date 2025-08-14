@@ -1,47 +1,37 @@
 import React from 'react';
-import { Zap, Crown, Mail, MessageSquare, Users, Gift } from 'lucide-react';
-import { CreditState } from '../services/credits';
+import { Zap, Crown, MessageSquare, Users, Gift } from 'lucide-react';
+import type { UserProfile } from '../services/auth';
 
 interface CreditDisplayProps {
-  creditState: CreditState;
-  onEmailSubmit: () => void;
+  profile: UserProfile;
   onFeedbackSubmit: () => void;
   onReferralSubmit?: () => void;
 }
 
 export const CreditDisplay: React.FC<CreditDisplayProps> = ({ 
-  creditState, 
-  onEmailSubmit, 
+  profile, 
   onFeedbackSubmit,
   onReferralSubmit
 }) => {
   const getPlanIcon = () => {
-    if (creditState.plan === 'starter') {
+    if (profile.plan_type === 'starter') {
       return <Crown className="w-4 h-4 text-yellow-500" />;
     }
     return <Zap className="w-4 h-4 text-blue-500" />;
   };
 
   const getPlanName = () => {
-    if (creditState.plan === 'starter') {
-      return creditState.subscriptionActive ? 'Starter Plan ($9/month)' : 'Starter Plan (Earned)';
+    if (profile.plan_type === 'starter') {
+      return 'Starter Plan ($9/month)';
     }
     return 'Free Plan';
   };
 
   const getPlanColor = () => {
-    if (creditState.plan === 'starter') {
+    if (profile.plan_type === 'starter') {
       return 'bg-yellow-50 border-yellow-200 text-yellow-800';
     }
     return 'bg-blue-50 border-blue-200 text-blue-800';
-  };
-
-  const getTotalPossibleCredits = () => {
-    let total = 1; // First visit
-    if (!creditState.email) total += 4;
-    if (!creditState.hasSubmittedFeedback) total += 10;
-    total += 15; // At least one referral possible
-    return total;
   };
 
   return (
@@ -52,36 +42,30 @@ export const CreditDisplay: React.FC<CreditDisplayProps> = ({
           <span className="font-semibold text-gray-900">{getPlanName()}</span>
         </div>
         <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getPlanColor()}`}>
-          {creditState.remainingCredits} credits left
+          {profile.credits} credits left
         </div>
       </div>
 
       {/* Free Credits Promotion */}
-      {creditState.plan === 'free' && (
+      {profile.plan_type === 'free' && (
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-4 border border-blue-100">
           <div className="flex items-center space-x-2 mb-2">
             <Gift className="w-5 h-5 text-purple-600" />
-            <span className="font-semibold text-gray-900">🎁 Earn Up to 30 Free Credits</span>
+            <span className="font-semibold text-gray-900">🎁 Earn More Free Credits</span>
           </div>
           <p className="text-sm text-gray-600 mb-3">
-            That's one full month of Starter Plan (a $9 value) — no subscription required!
+            Get up to 30 free credits — that's one full month of Starter Plan (a $9 value)!
           </p>
           
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-gray-600">👋 First app visit</span>
+              <span className="text-gray-600">👋 Account created</span>
               <span className="font-medium text-green-600">+1 credit ✓</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-gray-600">✉️ Submit email</span>
-              <span className={`font-medium ${creditState.email ? 'text-green-600' : 'text-blue-600'}`}>
-                +4 credits {creditState.email ? '✓' : ''}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
               <span className="text-gray-600">💬 Give honest feedback</span>
-              <span className={`font-medium ${creditState.hasSubmittedFeedback ? 'text-green-600' : 'text-blue-600'}`}>
-                +10 credits {creditState.hasSubmittedFeedback ? '✓' : ''}
+              <span className={`font-medium ${profile.has_submitted_feedback ? 'text-green-600' : 'text-blue-600'}`}>
+                +10 credits {profile.has_submitted_feedback ? '✓' : ''}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -92,30 +76,14 @@ export const CreditDisplay: React.FC<CreditDisplayProps> = ({
         </div>
       )}
 
-      {creditState.remainingCredits === 0 && (
+      {profile.credits === 0 && (
         <div className="space-y-3">
           <div className="text-sm text-gray-600 mb-3">
             You've used all your credits. Get more to continue:
           </div>
           
           <div className="grid gap-3">
-            {!creditState.email && (
-              <button
-                onClick={onEmailSubmit}
-                className="flex items-center justify-between p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group"
-              >
-                <div className="flex items-center space-x-3">
-                  <Mail className="w-5 h-5 text-blue-600" />
-                  <div className="text-left">
-                    <div className="font-medium text-blue-900">Submit Email</div>
-                    <div className="text-sm text-blue-600">Get 4 credits instantly</div>
-                  </div>
-                </div>
-                <div className="text-blue-600 group-hover:translate-x-1 transition-transform">→</div>
-              </button>
-            )}
-
-            {!creditState.hasSubmittedFeedback && (
+            {!profile.has_submitted_feedback && (
               <button
                 onClick={onFeedbackSubmit}
                 className="flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group"
@@ -148,11 +116,11 @@ export const CreditDisplay: React.FC<CreditDisplayProps> = ({
             )}
           </div>
 
-          {creditState.email && creditState.hasSubmittedFeedback && (
+          {profile.has_submitted_feedback && (
             <div className="text-center py-4 border-t border-gray-100 mt-4">
               <div className="text-gray-900 font-semibold mb-2">🚀 Ready for Starter Plan?</div>
               <div className="text-sm text-gray-600 mb-3">
-                Get 30 post generations/optimizations per month
+                Get 50 post generations/optimizations per month
               </div>
               <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-6 rounded-lg transition-colors">
                 Upgrade to Starter - $9/month
@@ -162,9 +130,9 @@ export const CreditDisplay: React.FC<CreditDisplayProps> = ({
         </div>
       )}
 
-      {creditState.plan === 'starter' && creditState.planExpiry && (
+      {profile.plan_type === 'starter' && (
         <div className="mt-3 text-xs text-gray-500">
-          {creditState.subscriptionActive ? 'Next billing' : 'Plan expires'}: {new Date(creditState.planExpiry).toLocaleDateString()}
+          Credits reset monthly • Next reset: {new Date(new Date(profile.last_credit_reset).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
         </div>
       )}
     </div>

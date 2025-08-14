@@ -1,58 +1,56 @@
 import React, { useState } from 'react';
-import { useEffect } from 'react';
+import { useAuth } from './hooks/useAuth';
+import { useCredit } from './services/auth';
 import Home from './components/Home';
 import Results from './components/Results';
-import EmailSubmission from './components/EmailSubmission';
+import AuthModal from './components/AuthModal';
 import FeedbackModal from './components/FeedbackModal';
 import { FormData } from './types';
 import { fetchResults } from './services/api';
-import { getCreditState, useCredit } from './services/credits';
 
 type Screen = 'home' | 'results';
 
 function App() {
+  const { user, profile, loading, refreshProfile } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [results, setResults] = useState<string[]>([]);
   const [currentMode, setCurrentMode] = useState<'generate' | 'optimize'>('generate');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [creditState, setCreditState] = useState(getCreditState());
-  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
-  useEffect(() => {
-    // Refresh credit state on app load
-    setCreditState(getCreditState());
-  }, []);
-
-  const refreshCreditState = () => {
-    setCreditState(getCreditState());
+  // Show auth modal if user is not authenticated
+  const requireAuth = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return false;
+    }
+    return true;
   };
 
   const handleFormSubmit = async (data: FormData) => {
+    if (!requireAuth() || !user || !profile) return;
+
     // Check if user has credits
-    if (creditState.remainingCredits <= 0) {
+    if (profile.credits <= 0) {
       setError('No credits remaining. Please get more credits to continue.');
       setTimeout(() => setError(null), 5000);
       return;
     }
-
-    // Use a credit
-    const creditUsed = useCredit();
-    if (!creditUsed) {
-      setError('Unable to use credit. Please try again.');
-      setTimeout(() => setError(null), 5000);
-      return;
-    }
-
-    // Refresh credit state
-    refreshCreditState();
 
     setIsLoading(true);
     setError(null);
     setCurrentMode(data.mode);
     
     try {
+      // Use a credit first
+      await useCredit(user.id);
+      
+      // Refresh profile to update credits
+      await refreshProfile();
+      
+      // Fetch results
       const apiResults = await fetchResults(data);
       
       if (apiResults.length === 0) {
@@ -78,13 +76,60 @@ function App() {
     setError(null);
   };
 
-  const handleEmailSuccess = () => {
-    refreshCreditState();
+  const handleAuthSuccess = () => {
+    setShowAuthModal(false);
+    // Profile will be automatically refreshed by useAuth hook
   };
 
   const handleFeedbackSuccess = () => {
-    refreshCreditState();
+    setShowFeedbackModal(false);
+    refreshProfile(); // Refresh to update credits
   };
+
+  // Show loading screen while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth modal if not authenticated
+  if (!user || !profile) {
+    return (
+      <>
+        <Home 
+          onSubmit={handleFormSubmit} 
+          isLoading={isLoading} 
+          profile={null}
+          onAuthRequired={() => setShowAuthModal(true)}
+          onFeedbackSubmit={() => setShowFeedbackModal(true)}
+        />
+        
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
+        
+        {/* Error Toast */}
+        {error && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-2 duration-300">
+            <div className="bg-red-500 text-white px-6 py-3 rounded-xl shadow-lg max-w-md mx-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <p className="font-medium">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="relative">
@@ -92,25 +137,18 @@ function App() {
         <Home 
           onSubmit={handleFormSubmit} 
           isLoading={isLoading} 
-          creditState={creditState}
-          onEmailSubmit={() => setShowEmailModal(true)}
+          profile={profile}
+          onAuthRequired={() => setShowAuthModal(true)}
           onFeedbackSubmit={() => setShowFeedbackModal(true)}
         />
       ) : (
         <Results results={results} onNewQuery={handleNewQuery} mode={currentMode} />
       )}
       
-      {/* Email Submission Modal */}
-      {showEmailModal && (
-        <EmailSubmission
-          onClose={() => setShowEmailModal(false)}
-          onSuccess={handleEmailSuccess}
-        />
-      )}
-
       {/* Feedback Modal */}
-      {showFeedbackModal && (
+      {showFeedbackModal && user && (
         <FeedbackModal
+          userId={user.id}
           onClose={() => setShowFeedbackModal(false)}
           onSuccess={handleFeedbackSuccess}
         />

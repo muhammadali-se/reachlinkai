@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
-import { Sparkles, RefreshCw, Info, Lightbulb, Edit3 } from 'lucide-react';
+import { Sparkles, RefreshCw, Info, Lightbulb, Edit3, LogOut } from 'lucide-react';
 import { Mode, FormData, Tone } from '../types';
 import { shouldUseMockData } from '../services/api';
-import { CreditState } from '../services/credits';
+import { signOut } from '../services/auth';
+import type { UserProfile } from '../services/auth';
 import { CreditDisplay } from './CreditDisplay';
 
 interface HomeProps {
   onSubmit: (data: FormData) => void;
   isLoading: boolean;
-  creditState: CreditState;
-  onEmailSubmit: () => void;
+  profile: UserProfile | null;
+  onAuthRequired: () => void;
   onFeedbackSubmit: () => void;
 }
 
 const Home: React.FC<HomeProps> = ({ 
   onSubmit, 
   isLoading, 
-  creditState, 
-  onEmailSubmit, 
+  profile,
+  onAuthRequired,
   onFeedbackSubmit 
 }) => {
   const [mode, setMode] = useState<Mode>('optimize');
@@ -29,11 +30,24 @@ const Home: React.FC<HomeProps> = ({
     e.preventDefault();
     if (!input.trim()) return;
 
+    if (!profile) {
+      onAuthRequired();
+      return;
+    }
+
     onSubmit({
       mode,
       tone,
       input: input.trim()
     });
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const getActionIcon = () => {
@@ -58,6 +72,9 @@ const Home: React.FC<HomeProps> = ({
   };
 
   const getButtonText = () => {
+    if (!profile) {
+      return 'Sign Up to Start';
+    }
     return mode === 'generate' ? 'Generate Posts' : 'Improve Post';
   };
 
@@ -96,12 +113,42 @@ const Home: React.FC<HomeProps> = ({
         )}
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* User Info & Sign Out */}
+          {profile && (
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+              <div>
+                <p className="text-sm text-gray-600">Welcome back!</p>
+                <p className="font-semibold text-gray-900">{profile.email}</p>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">Sign Out</span>
+              </button>
+            </div>
+          )}
+
           {/* Credit Display */}
-          <CreditDisplay 
-            creditState={creditState}
-            onEmailSubmit={onEmailSubmit}
-            onFeedbackSubmit={onFeedbackSubmit}
-          />
+          {profile ? (
+            <CreditDisplay 
+              profile={profile}
+              onFeedbackSubmit={onFeedbackSubmit}
+            />
+          ) : (
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-6 border border-blue-100">
+              <div className="text-center">
+                <h3 className="font-semibold text-gray-900 mb-2">🎁 Get Started with 1 Free Credit</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Create your account and start optimizing your LinkedIn posts immediately
+                </p>
+                <p className="text-xs text-gray-500">
+                  Plus earn up to 30 free credits — that's a $9 value!
+                </p>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Mode Selection */}
@@ -214,7 +261,7 @@ const Home: React.FC<HomeProps> = ({
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading || !input.trim() || creditState.remainingCredits <= 0}
+              disabled={isLoading || !input.trim() || (profile && profile.credits <= 0)}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 group"
             >
               {isLoading ? (

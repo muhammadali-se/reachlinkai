@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { MessageSquare, CheckCircle2, X, Star } from 'lucide-react';
-import { addFeedbackReward } from '../services/credits';
+import { addFeedbackReward } from '../services/auth';
 
 interface FeedbackModalProps {
+  userId: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const FeedbackModal: React.FC<FeedbackModalProps> = ({ onClose, onSuccess }) => {
+const FeedbackModal: React.FC<FeedbackModalProps> = ({ userId, onClose, onSuccess }) => {
   const [feedback, setFeedback] = useState('');
   const [rating, setRating] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [reward, setReward] = useState<'credits' | 'starter' | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,18 +23,25 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ onClose, onSuccess }) => 
 
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Give fixed 10 credits for feedback
-    addFeedbackReward();
-    setReward('credits');
-    setIsSuccess(true);
-    
-    setTimeout(() => {
-      onSuccess();
-      onClose();
-    }, 3000);
+    try {
+      // Add feedback reward to database
+      await addFeedbackReward(userId);
+      
+      // TODO: Store feedback in database for analysis
+      console.log('Feedback submitted:', { feedback, rating, userId });
+      
+      setIsSuccess(true);
+      
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 2000);
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      // Handle error (show toast, etc.)
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSuccess) {
